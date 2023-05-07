@@ -61,15 +61,15 @@ class MTRState(object):
     def __init__(self, max_ttl):
         self._max_ttl = max_ttl
         self._target_dst = None
-        self.is_reached = False
+        self._is_reached = False
         self.total_ttl = 1
         self.hops = []
 
     def receive(self, query, answer):
         if self._target_dst is None:
             self._target_dst = get_ip_packet(query).dst
-        if not self.is_reached and answer is not None:
-            self.is_reached = self._target_dst == get_ip_packet(answer).src
+        if not self._is_reached and answer is not None:
+            self._is_reached = self._target_dst == get_ip_packet(answer).src
         orig_ttl = None
         if IP in query:
             orig_ttl = query[IP].ttl
@@ -99,8 +99,11 @@ class MTRState(object):
         return len(self.hops[-1].hosts) > 0 or len(self.hops[-2].hosts) > 0
 
     def prolong_if_needed(self):
-        if not self.is_reached and self._can_prolong() and self.total_ttl < self._max_ttl:
+        if not self._is_reached and self._can_prolong() and self.total_ttl < self._max_ttl:
             self.total_ttl += 1
+
+    def is_reached(self):
+        return self._is_reached or self.total_ttl == self._max_ttl
 
 
 def build_datagram_packet(args, dst_host, ttl):
@@ -147,7 +150,7 @@ def run_mtr(stdscr, args):
     state = MTRState(max_ttl)
     while True:
         cur_ttl = None
-        if state.is_reached:
+        if state.is_reached():
             cur_ttl = (1, state.total_ttl)
         else:
             cur_ttl = state.total_ttl
